@@ -1,0 +1,447 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hospital Management System</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Arial, sans-serif; background: #f3f6fb; color: #243247; }
+        header { background: #126782; color: white; padding: 22px 30px; }
+        header h1 { margin: 0 0 8px; }
+        nav { background: white; padding: 15px 25px; position: sticky; top: 0; z-index: 5; box-shadow: 0 2px 6px #0001; }
+        nav a { color: #126782; text-decoration: none; font-weight: bold; margin: 5px 12px 5px 0; display: inline-block; }
+        main { max-width: 1400px; margin: auto; padding: 22px; }
+        section { background: white; padding: 22px; margin-bottom: 24px; border-radius: 10px; box-shadow: 0 2px 10px #0000000c; scroll-margin-top: 85px; }
+        h2 { color: #126782; margin-top: 0; }
+        h3 { margin-top: 22px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap: 14px; }
+        .stat { background: white; border-left: 5px solid #1685a0; border-radius: 8px; padding: 18px; box-shadow: 0 2px 8px #0001; }
+        .stat h3 { margin: 0 0 10px; font-size: 15px; color: #64748b; }
+        .stat p { margin: 0; font-size: 27px; font-weight: bold; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(170px,1fr)); gap: 12px; margin-bottom: 12px; }
+        input, select, button { font: inherit; }
+        input, select { width: 100%; padding: 9px; border: 1px solid #cbd5e1; border-radius: 5px; background: white; margin: 3px 0; }
+        label { display: block; font-size: 13px; font-weight: bold; margin-top: 8px; }
+        button { border: 0; border-radius: 5px; padding: 9px 13px; background: #126782; color: white; cursor: pointer; margin: 3px 0; }
+        button:hover { opacity: .88; }
+        button.danger { background: #c0392b; }
+        button.success { background: #218838; }
+        .table-wrap { overflow-x: auto; width: 100%; }
+        table { width: 100%; border-collapse: collapse; min-width: 700px; }
+        th, td { text-align: left; padding: 11px; border-bottom: 1px solid #e5eaf0; vertical-align: top; }
+        th { background: #eaf4f7; color: #126782; }
+        td form { margin: 4px 0; }
+        .badge { display: inline-block; padding: 5px 9px; border-radius: 20px; background: #e5e7eb; font-size: 12px; }
+        .badge.Scheduled { background: #dbeafe; color: #1d4ed8; }
+        .badge.Completed { background: #dcfce7; color: #166534; }
+        .badge.Cancelled { background: #fee2e2; color: #991b1b; }
+        .flash { padding: 12px; margin-bottom: 12px; border-radius: 5px; background: #dcfce7; color: #166534; }
+        .empty { text-align: center; color: #64748b; padding: 20px; }
+        details { min-width: 180px; }
+        summary { color: #126782; cursor: pointer; font-weight: bold; margin: 5px 0; }
+        footer { text-align: center; padding: 20px; color: #64748b; }
+        @media(max-width:600px) { main { padding: 10px; } section { padding: 14px; } }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Hospital Management System</h1>
+    <p>Manage patients, doctors, departments, appointments and bills.</p>
+</header>
+
+<nav>
+    <a href="#dashboard">Dashboard</a>
+    <a href="#patients">Patients</a>
+    <a href="#doctors">Doctors</a>
+    <a href="#departments">Departments</a>
+    <a href="#appointments">Appointments</a>
+    <a href="#billing">Billing</a>
+</nav>
+
+<main>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="flash">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- DASHBOARD -->
+    <section id="dashboard">
+        <h2>Dashboard</h2>
+        <div class="stats">
+            <div class="stat">
+                <h3>Total Patients</h3>
+                <p>{{ total_patients }}</p>
+            </div>
+            <div class="stat">
+                <h3>Total Doctors</h3>
+                <p>{{ total_doctors }}</p>
+            </div>
+            <div class="stat">
+                <h3>Total Appointments</h3>
+                <p>{{ total_appointments }}</p>
+            </div>
+            <div class="stat">
+                <h3>Pending Bills</h3>
+                <p>₹{{ '%.2f'|format(pending_bills|float) }}</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- PATIENTS -->
+    <section id="patients">
+        <h2>Patients</h2>
+        <h3>Add Patient</h3>
+        <form action="{{ url_for('add_patient') }}" method="POST">
+            <div class="form-grid">
+                <input name="name" placeholder="Patient name" required>
+                <input name="age" type="number" min="1" max="120" placeholder="Age" required>
+                <select name="gender">
+                    <option value="">Select gender</option>
+                    <option>Male</option>
+                    <option>Female</option>
+                    <option>Other</option>
+                </select>
+                <input name="phone" placeholder="Phone number">
+                <input name="disease" placeholder="Disease">
+            </div>
+            <button type="submit">Add Patient</button>
+        </form>
+
+        <h3>Patient Records</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>ID</th><th>Name</th><th>Age</th><th>Gender</th><th>Phone</th><th>Disease</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for p in patients %}
+                    <tr>
+                        <td>{{ p.patient_id }}</td>
+                        <td>{{ p.name }}</td>
+                        <td>{{ p.age }}</td>
+                        <td>{{ p.gender }}</td>
+                        <td>{{ p.phone or '' }}</td>
+                        <td>{{ p.disease or '' }}</td>
+                        <td>
+                            <details>
+                                <summary>Edit patient</summary>
+                                <form action="{{ url_for('update_patient', pid=p.patient_id) }}" method="POST">
+                                    <label>Name</label>
+                                    <input name="name" value="{{ p.name }}" required>
+                                    <label>Age</label>
+                                    <input name="age" type="number" min="1" max="120" value="{{ p.age }}" required>
+                                    <label>Gender</label>
+                                    <select name="gender">
+                                        <option value="Male" {% if p.gender == 'Male' %}selected{% endif %}>Male</option>
+                                        <option value="Female" {% if p.gender == 'Female' %}selected{% endif %}>Female</option>
+                                        <option value="Other" {% if p.gender == 'Other' %}selected{% endif %}>Other</option>
+                                    </select>
+                                    <label>Phone</label>
+                                    <input name="phone" value="{{ p.phone or '' }}">
+                                    <label>Disease</label>
+                                    <input name="disease" value="{{ p.disease or '' }}">
+                                    <button type="submit">Save Changes</button>
+                                </form>
+                            </details>
+                            <form action="{{ url_for('delete_patient', pid=p.patient_id) }}" method="POST" onsubmit="return confirm('Delete this patient?')">
+                                <button class="danger" type="submit">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="empty">No patients found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- DOCTORS -->
+    <section id="doctors">
+        <h2>Doctors</h2>
+        <h3>Add Doctor</h3>
+        <form action="{{ url_for('add_doctor') }}" method="POST">
+            <div class="form-grid">
+                <input name="doctor_name" placeholder="Doctor name" required>
+                <input name="specialization" placeholder="Specialization" required>
+                <input name="phone" placeholder="Phone number">
+                <select name="department_id">
+                    <option value="">Select department</option>
+                    {% for dep in departments %}
+                    <option value="{{ dep.department_id }}">{{ dep.department_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit">Add Doctor</button>
+        </form>
+
+        <h3>Doctor Records</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>ID</th><th>Name</th><th>Specialization</th><th>Phone</th><th>Department</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for d in doctors %}
+                    <tr>
+                        <td>{{ d.doctor_id }}</td>
+                        <td>{{ d.doctor_name }}</td>
+                        <td>{{ d.specialization }}</td>
+                        <td>{{ d.phone or '' }}</td>
+                        <td>{{ d.department_name or '' }}</td>
+                        <td>
+                            <details>
+                                <summary>Edit doctor</summary>
+                                <form action="{{ url_for('update_doctor', did=d.doctor_id) }}" method="POST">
+                                    <label>Name</label>
+                                    <input name="doctor_name" value="{{ d.doctor_name }}" required>
+                                    <label>Specialization</label>
+                                    <input name="specialization" value="{{ d.specialization }}" required>
+                                    <label>Phone</label>
+                                    <input name="phone" value="{{ d.phone or '' }}">
+                                    <label>Department</label>
+                                    <select name="department_id">
+                                        <option value="">No department</option>
+                                        {% for dep in departments %}
+                                        <option value="{{ dep.department_id }}" {% if dep.department_id == d.department_id %}selected{% endif %}>{{ dep.department_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <button type="submit">Save Changes</button>
+                                </form>
+                            </details>
+                            <form action="{{ url_for('delete_doctor', did=d.doctor_id) }}" method="POST" onsubmit="return confirm('Delete this doctor?')">
+                                <button class="danger" type="submit">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="empty">No doctors found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- DEPARTMENTS -->
+    <section id="departments">
+        <h2>Departments</h2>
+        <h3>Add Department</h3>
+        <form action="{{ url_for('add_department') }}" method="POST">
+            <div class="form-grid">
+                <input name="department_name" placeholder="Department name" required>
+                <input name="location" placeholder="Location">
+            </div>
+            <button type="submit">Add Department</button>
+        </form>
+
+        <h3>Department Records</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>ID</th><th>Department</th><th>Location</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for dep in departments %}
+                    <tr>
+                        <td>{{ dep.department_id }}</td>
+                        <td>{{ dep.department_name }}</td>
+                        <td>{{ dep.location or '' }}</td>
+                        <td>
+                            <details>
+                                <summary>Edit department</summary>
+                                <form action="{{ url_for('update_department', dep_id=dep.department_id) }}" method="POST">
+                                    <label>Department name</label>
+                                    <input name="department_name" value="{{ dep.department_name }}" required>
+                                    <label>Location</label>
+                                    <input name="location" value="{{ dep.location or '' }}">
+                                    <button type="submit">Save Changes</button>
+                                </form>
+                            </details>
+                            <form action="{{ url_for('delete_department', dep_id=dep.department_id) }}" method="POST" onsubmit="return confirm('Delete this department?')">
+                                <button class="danger" type="submit">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="empty">No departments found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- APPOINTMENTS -->
+    <section id="appointments">
+        <h2>Appointments</h2>
+        <h3>Book Appointment</h3>
+        <form action="{{ url_for('add_appointment') }}" method="POST">
+            <div class="form-grid">
+                <select name="patient_id" required>
+                    <option value="">Select patient</option>
+                    {% for p in patients %}
+                    <option value="{{ p.patient_id }}">{{ p.name }} (ID {{ p.patient_id }})</option>
+                    {% endfor %}
+                </select>
+                <select name="doctor_id" required>
+                    <option value="">Select doctor</option>
+                    {% for d in doctors %}
+                    <option value="{{ d.doctor_id }}">{{ d.doctor_name }}</option>
+                    {% endfor %}
+                </select>
+                <input type="date" name="appointment_date" min="{{ today }}" required>
+                <input type="time" name="appointment_time" required>
+                <input name="diagnosis" placeholder="Diagnosis">
+            </div>
+            <button type="submit">Book Appointment</button>
+        </form>
+
+        <h3>Appointment Records</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>ID</th><th>Patient</th><th>Doctor</th><th>Date</th><th>Time</th><th>Diagnosis</th><th>Status</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for a in appointments %}
+                    <tr>
+                        <td>{{ a.appointment_id }}</td>
+                        <td>{{ a.patient_name }}</td>
+                        <td>{{ a.doctor_name }}</td>
+                        <td>{{ a.appointment_date }}</td>
+                        <td>
+                            {% if a.appointment_time %}
+                                {% if a.appointment_time.total_seconds is defined %}
+                                    {{ '%02d:%02d'|format((a.appointment_time.total_seconds() // 3600)|int, ((a.appointment_time.total_seconds() % 3600) // 60)|int) }}
+                                {% else %}
+                                    {{ a.appointment_time.strftime('%H:%M') }}
+                                {% endif %}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ a.diagnosis or '' }}
+                            <details>
+                                <summary>Edit appointment</summary>
+                                <form action="{{ url_for('update_appointment', aid=a.appointment_id) }}" method="POST">
+                                    <label>Patient</label>
+                                    <select name="patient_id" required>
+                                        {% for p in patients %}
+                                        <option value="{{ p.patient_id }}" {% if p.patient_id == a.patient_id %}selected{% endif %}>{{ p.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <label>Doctor</label>
+                                    <select name="doctor_id" required>
+                                        {% for d in doctors %}
+                                        <option value="{{ d.doctor_id }}" {% if d.doctor_id == a.doctor_id %}selected{% endif %}>{{ d.doctor_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <label>Date</label>
+                                    <input type="date" name="appointment_date" value="{{ a.appointment_date.strftime('%Y-%m-%d') if a.appointment_date else '' }}" required>
+                                    <label>Time</label>
+                                    <input type="time" name="appointment_time" value="{{ '%02d:%02d'|format((a.appointment_time.total_seconds() // 3600)|int, ((a.appointment_time.total_seconds() % 3600) // 60)|int) if a.appointment_time and a.appointment_time.total_seconds is defined else (a.appointment_time.strftime('%H:%M') if a.appointment_time else '') }}" required>
+                                    <label>Diagnosis</label>
+                                    <input name="diagnosis" value="{{ a.diagnosis or '' }}">
+                                    <button type="submit">Save Changes</button>
+                                </form>
+                            </details>
+                        </td>
+                        <td>
+                            <span class="badge {{ a.status }}">{{ a.status }}</span>
+                            <form action="{{ url_for('update_appointment_status', aid=a.appointment_id) }}" method="POST">
+                                <label>Change Status</label>
+                                <select name="status" required>
+                                    <option value="Scheduled" {% if a.status == 'Scheduled' %}selected{% endif %}>Scheduled</option>
+                                    <option value="Completed" {% if a.status == 'Completed' %}selected{% endif %}>Completed</option>
+                                    <option value="Cancelled" {% if a.status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                                </select>
+                                <button type="submit">Save Status</button>
+                            </form>
+                        </td>
+                        <td>
+                            <form action="{{ url_for('delete_appointment', aid=a.appointment_id) }}" method="POST" onsubmit="return confirm('Delete appointment?')">
+                                <button class="danger" type="submit">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="8" class="empty">No appointments found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- BILLING -->
+    <section id="billing">
+        <h2>Billing</h2>
+        <h3>Create Bill</h3>
+        <form action="{{ url_for('add_bill') }}" method="POST">
+            <div class="form-grid">
+                <select name="patient_id" required>
+                    <option value="">Select patient</option>
+                    {% for p in patients %}
+                    <option value="{{ p.patient_id }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+                <select name="appointment_id">
+                    <option value="">No linked appointment</option>
+                    {% for a in appointments %}
+                    <option value="{{ a.appointment_id }}">Appointment {{ a.appointment_id }} — {{ a.patient_name }}</option>
+                    {% endfor %}
+                </select>
+                <input type="number" name="amount" placeholder="Amount (₹)" min="0.01" step="0.01" required>
+                <input type="date" name="bill_date" value="{{ today }}" required>
+            </div>
+            <button type="submit">Create Bill</button>
+        </form>
+
+        <h3>Bill Records</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Bill ID</th><th>Patient</th><th>Appointment</th><th>Amount</th><th>Date</th><th>Payment Status</th><th>Action</th></tr>
+                </thead>
+                <tbody>
+                    {% for b in bills %}
+                    <tr>
+                        <td>{{ b.bill_id }}</td>
+                        <td>{{ b.patient_name }}</td>
+                        <td>{{ b.appointment_id or '—' }}</td>
+                        <td>₹{{ '%.2f'|format(b.amount|float) }}</td>
+                        <td>{{ b.bill_date }}</td>
+                        <td>
+                            {% if b.payment_status == 'Paid' %}
+                                <span class="badge Completed">Paid</span>
+                            {% else %}
+                                <span class="badge Scheduled">{{ b.payment_status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if b.payment_status != 'Paid' %}
+                            <form action="{{ url_for('pay_bill', bid=b.bill_id) }}" method="POST">
+                                <button class="success" type="submit">Mark as Paid</button>
+                            </form>
+                            {% else %}
+                                Already paid
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="empty">No bills found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+<footer>Hospital Management System | Flask + MySQL</footer>
+</body>
+</html>
